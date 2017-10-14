@@ -37,6 +37,8 @@ from .dirutils import fnmatches
 from .opcodes import disassemble
 from .pack import compile_struct, unpack, UnpackException
 
+import sys
+
 
 __all__ = (
     "JavaClassInfo", "JavaConstantPool", "JavaMemberInfo",
@@ -186,7 +188,7 @@ class JavaConstantPool(object):
         # but not data
         hackpass = False
 
-        for _i in xrange(0, count):
+        for _i in range(0, count):
 
             if hackpass:
                 # previous item was a long or double
@@ -248,7 +250,7 @@ class JavaConstantPool(object):
         constant pool entries.
         """
 
-        for i in xrange(1, len(self.consts)):
+        for i in range(1, len(self.consts)):
             t, _v = self.consts[i]
             if t:
                 yield (i, t, self.deref_const(i))
@@ -260,7 +262,7 @@ class JavaConstantPool(object):
         pool entries.
         """
 
-        for i in xrange(1, len(self.consts)):
+        for i in range(1, len(self.consts)):
             t, v = self.pretty_const(i)
             if t:
                 yield (i, t, v)
@@ -364,7 +366,7 @@ class JavaAttributes(dict):
         cval = self.cpool.deref_const
 
         (count,) = unpacker.unpack_struct(_H)
-        for _i in xrange(0, count):
+        for _i in range(0, count):
             (name, size) = unpacker.unpack_struct(_HI)
             self[cval(name)] = unpacker.read(size)
 
@@ -425,7 +427,7 @@ class JavaClassInfo(object):
         # only unpack the magic bytes if it wasn't specified
         magic = magic or unpacker.unpack_struct(_BBBB)
 
-        if isinstance(magic, (str, buffer)):
+        if isinstance(magic, (str, bytearray)):
             magic = tuple(ord(m) for m in magic)
         else:
             magic = tuple(magic)
@@ -904,7 +906,7 @@ class JavaClassInfo(object):
                     # the event that this was a method or field on the
                     # array, we'll throw away that as well, and just
                     # emit the type contained in the array.
-                    t, _buff = _next_argsig(buffer(pv))
+                    t, _buff = _next_argsig(bytearray(pv))
                     if t[1] == "L":
                         pv = _pretty_type(t[1:])
                     else:
@@ -1205,7 +1207,7 @@ class JavaMemberInfo(object):
 
                     if for_params:
                         (param_count, ) = up.unpack_struct(_B)
-                        annos = (tuple(unp()) for i in xrange(param_count))
+                        annos = (tuple(unp()) for i in range(param_count))
                     else:
                         annos = unp()
                     annos = tuple(annos)
@@ -1845,7 +1847,7 @@ class JavaAnnotation(dict):
     def unpack(self, unpacker):
         self.type_ref, count = unpacker.unpack_struct(_HH)
 
-        for _i in xrange(0, count):
+        for _i in range(0, count):
             key_ref, = unpacker.unpack_struct(_H)
             val = _unpack_annotation_val(unpacker, self.cpool)
 
@@ -1929,7 +1931,7 @@ def _annotation_val_eq(left_tag, left_data, left_cpool,
         if len(left_data) != len(right_data):
             return False
 
-        for index in xrange(0, len(left_data)):
+        for index in range(0, len(left_data)):
             ld = left_data[index]
             rd = right_data[index]
             if not _annotation_val_eq(ld[0], ld[1], left_cpool,
@@ -1962,7 +1964,7 @@ def _unpack_annotation_val(unpacker, cpool):
     elif tag == '[':
         data = list()
         count, = unpacker.unpack_struct(_H)
-        for _i in xrange(0, count):
+        for _i in range(0, count):
             data.append(_unpack_annotation_val(unpacker, cpool))
 
     return (tag, data)
@@ -2093,6 +2095,9 @@ def _pretty_const_type_val(typecode, val):
 
     if typecode == CONST_Utf8:
         typestr = "Utf8"  # formerly Asciz, which was considered Java bug
+        is_python3 = sys.version_info.major == 3
+        if is_python3:
+            unicode = str
         if isinstance(val, unicode):
             val = repr(val)[2:-1]  # trim off the surrounding u"" (HACK)
         else:
@@ -2166,24 +2171,26 @@ def _next_argsig(buff):
     return it and a new buffer advanced past that point
     """
 
+    #c = chr(buff[0])
     c = buff[0]
 
     if c in "BCDFIJSVZ":
-        result = (c, buffer(buff, 1))
+        result = (c, buff[1:])
 
     elif c == "[":
-        d, buff = _next_argsig(buffer(buff, 1))
+        d, buff = _next_argsig(buff[1:])
         result = (c + d, buff)
 
     elif c == "L":
         s = buff[:]
-        i = s.find(';') + 1
-        result = (s[:i], buffer(buff, i))
+        #print('s:' + s)
+        i = str(s).find(';') + 1
+        result = (s[:i], buff[i:])
 
     elif c == "(":
         s = buff[:]
-        i = s.find(')') + 1
-        result = (s[:i], buffer(buff, i))
+        i = str(s).find(')') + 1
+        result = (s[:i], buff[i:])
 
     else:
         raise Unimplemented("_next_argsig is %r in %r" % (c, str(buff)))
@@ -2196,7 +2203,9 @@ def _typeseq_iter(s):
     iterate through all of the type signatures in a sequence
     """
 
-    buff = buffer(str(s))
+    #print("s:" + s)
+    #buff = bytearray(s)
+    buff = s
     while buff:
         t, buff = _next_argsig(buff)
         yield t
@@ -2279,7 +2288,7 @@ def _pretty_class(s):
     """
 
     # well that's easy.
-    return s.replace("/", ".")
+    return str(s).replace("/", ".")
 
 
 def _clean_array_const(s):
@@ -2287,7 +2296,7 @@ def _clean_array_const(s):
     de-array a constant type.
     """
 
-    t, b = _next_argsig(buffer(s))
+    t, b = _next_argsig(bytearray(s))
     return (t, str(b))
 
 

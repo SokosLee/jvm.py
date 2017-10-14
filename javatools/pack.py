@@ -131,7 +131,7 @@ class Unpacker(object):
 
         (count,) = self.unpack_struct(_H)
         sfmt = compile_struct(fmt)
-        for _i in xrange(count):
+        for _i in range(count):
             yield self.unpack_struct(sfmt)
 
 
@@ -143,7 +143,7 @@ class Unpacker(object):
         """
 
         (count,) = self.unpack_struct(_H)
-        for _i in xrange(count):
+        for _i in range(count):
             yield self.unpack_struct(struct)
 
 
@@ -157,7 +157,7 @@ class Unpacker(object):
         """
 
         (count,) = self.unpack_struct(_H)
-        for _i in xrange(count):
+        for _i in range(count):
             obj = atype(*params, **kwds)
             obj.unpack(self)
             yield obj
@@ -337,8 +337,7 @@ def unpack(data):
     context interface, so may be used eg: `with unpack(my_data) as
     unpacker:`
     """
-
-    if isinstance(data, (str, buffer)):
+    if isinstance(data, (str, bytearray, bytes)):
         return BufferUnpacker(data)
 
     elif hasattr(data, "read"):
